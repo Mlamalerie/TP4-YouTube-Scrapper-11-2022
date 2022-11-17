@@ -17,10 +17,13 @@ from selenium.webdriver.common.action_chains import ActionChains
 import json
 from bs4 import BeautifulSoup
 from time import sleep
-from typing import List, Tuple
+from typing import List, Tuple, Any
 import json
 
-WORKERS = 3
+# Params
+WORKERS = 2
+
+
 class YouTubeVideoScrapper():
 
     def __init__(self) -> None:
@@ -35,13 +38,13 @@ class YouTubeVideoScrapper():
 
         self.cookies_accepted = False
 
-    def go(self, video_id : str) -> None:
+    def go(self, video_id: str) -> None:
 
         # OPEN PAGE
         self.driver.get(f"https://www.youtube.com/watch?v={video_id}")
         self.video_id = video_id
         self.current_url = self.driver.current_url
-        print(f"> {self.video_id}")
+        print(f">>> {self.video_id} <<<")
 
         # CLICK COOKIES
         if not self.cookies_accepted:
@@ -56,7 +59,6 @@ class YouTubeVideoScrapper():
 
         self.soup = BeautifulSoup(str((self.driver.page_source).encode('utf-8')), 'lxml')
 
-
     def __click_accept_cookies(self) -> None:
         button = self.wait.until(EC.element_to_be_clickable(
             (By.XPATH, '//*[@id="content"]/div[2]/div[6]/div[1]/ytd-button-renderer[2]/yt-button-shape/button')))
@@ -70,13 +72,13 @@ class YouTubeVideoScrapper():
                                           '/html/body/ytd-app/div[1]/ytd-page-manager/ytd-watch-flexy/div[5]/div[1]/div/div[2]/ytd-watch-metadata/div/div[3]/div[1]/div/ytd-text-inline-expander/tp-yt-paper-button[1]')
         button.click()
 
-    def __scroll_down(self, scroll_pause_time=1, k_scrolls=6) -> None:
+    def __scroll_down(self, scroll_pause_time: float = 1, k_scrolls: int = 3) -> None:
 
         # Get scroll height
-        print("... let's scrolling... ",end="")
+        print(f"  > {self.video_id}... let's scrolling... ")
         last_height = self.driver.execute_script("return document.documentElement.scrollHeight")
         k = 0
-        while True:
+        while k < k_scrolls:
             # Scroll down to bottom
             self.driver.execute_script("window.scrollTo(0, arguments[0]);", last_height)
             # Wait to load page
@@ -88,11 +90,11 @@ class YouTubeVideoScrapper():
                 break
             last_height = new_height
             k += 1
-        print(f"ok i'am at the bottom (after {k} scrolling) !")
+        print(f"  > {self.video_id}ok i'am at the bottom (after {k} scrolling) !")
 
     def get_all_infos(self) -> dict:
 
-        result = {"video_id" : self.video_id, "video_url": self.current_url}
+        result = {"video_id": self.video_id, "video_url": self.current_url}
 
         div_above_the_fold = self.soup.find("div", {"id": "above-the-fold"})
         div_comments = self.soup.find("ytd-comments", {"id": "comments"})
@@ -120,7 +122,7 @@ class YouTubeVideoScrapper():
         result['video_description_links'] = links
 
         # ID VIDEO
-        #result['video_id'] = self.current_url.split("?v=")[-1]
+        # result['video_id'] = self.current_url.split("?v=")[-1]
 
         # COMMENTS
         nb_comments_item = div_comments.find("h2", {"id": "count"}).find("span")
@@ -139,56 +141,57 @@ class YouTubeVideoScrapper():
                  "vote_count": vote_count_item.text})
 
         result["video_comments"] = comments_result
-        print(f"... done.")
+        print(f">>> {self.video_id}... done.")
         return result
 
 
 def read_input_json(json_file_path: str) -> List[str]:
     with open(json_file_path, "r") as f:
         data = json.load(f)
-    return data["videos_id"][:2]
+    return data["videos_id"]
 
-def write_output_json(data,output_file_path="output.json"):
+
+def write_output_json(data: List[dict], output_file_path: str = "output.json") -> None:
     date_time = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
 
-    output_dict = {"date_time" :date_time, "data": data}
+    output_dict = {"date_time": date_time, "data": data}
     with open(output_file_path, "w") as f:
-        json.dump(output_dict, f,indent=4)
+        json.dump(output_dict, f, indent=4)
     print(f"*******\njSON OUTPUT FILE : {output_file_path}\n*******")
 
 
-def chunks(lst, n):
+def chunks(lst: List[Any], n : int) -> List[List[Any]]:
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
         yield lst[i:i + n]
 
 
-def start_scraping(videos_id):
+def start_scraping(videos_id : str) -> List[dict]:
     scrapping_results = []
     scrapper = YouTubeVideoScrapper()
     for video_id in videos_id:
         scrapper.go(video_id=video_id)
         scrapping_results.append(scrapper.get_all_infos())
+
     return scrapping_results
+
+
 def main() -> None:
     videos_id = read_input_json("input.json")
     print(f"*******\nIDs TO SCRAP : {videos_id}\n*******")
 
-    p = len(videos_id)//WORKERS
-    p = p if len(videos_id)%WORKERS == 0 else p + 1
+    p = len(videos_id) // WORKERS
+    p = p if len(videos_id) % WORKERS == 0 else p + 1
     videos_id_chunks = list(chunks(videos_id, p))
     print([len(v) for v in videos_id_chunks])
 
     results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        futures = []
-
-        futures.append(executor.map(start_scraping, videos_id_chunks))
-        for future in concurrent.futures.as_completed(results):
-            results += future.result()
-
+    with concurrent.futures.ThreadPoolExecutor(max_workers=WORKERS) as executor:
+        for result in executor.map(start_scraping, videos_id_chunks):
+            results += result
 
     write_output_json(data=results)
+
 
 if __name__ == "__main__":
     main()
