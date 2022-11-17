@@ -19,16 +19,15 @@ A l'aide de bs4 et Selenimum, pour chaque url :
 3. Ouvrir tous les boutons "read more"
 4. Convertir la page et l'envoyer à bs4
 5. Récuperer :
-
-- id : identifiant de la video
-- url : l'url complet
-- title : le titre
-- author_name et author_url
-- views
-- published_date
-- description_text et description_links
-- nb_comments
-- comments
+   - id : identifiant de la video
+   - url : l'url complet
+   - title : le titre
+   - author_name et author_url
+   - views
+   - published_date
+   - description_text et description_links
+   - nb_comments
+   - comments
 
 On scrappera notre liste en parallèle pour gagner du temps grace au multithreading
 
