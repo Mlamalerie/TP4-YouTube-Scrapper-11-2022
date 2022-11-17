@@ -78,7 +78,7 @@ class YouTubeVideoScrapper():
         print(f"  > {self.video_id}... let's scrolling... ")
         last_height = self.driver.execute_script("return document.documentElement.scrollHeight")
         k = 0
-        while k < k_scrolls:
+        while True:
             # Scroll down to bottom
             self.driver.execute_script("window.scrollTo(0, arguments[0]);", last_height)
             # Wait to load page
