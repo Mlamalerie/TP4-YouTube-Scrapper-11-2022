@@ -1,31 +1,33 @@
+
+import json
 import concurrent.futures
-
-import pandas as pd
-import numpy as np
-import requests
-
 from datetime import datetime
+from bs4 import BeautifulSoup
+from time import sleep
+from typing import List, Tuple, Any,Generator
+from typeguard import typechecked
+import argparse
+
 from selenium import webdriver
 from selenium.common import StaleElementReferenceException, TimeoutException
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.action_chains import ActionChains
-import json
-from bs4 import BeautifulSoup
-from time import sleep
-from typing import List, Tuple, Any
-import json
+
 
 # Params
 WORKERS = 2
+# Args
+parser = argparse.ArgumentParser()
+parser.add_argument('--input', help='Input JSON file with URLs', required=True)
+parser.add_argument('--output', help='Output JSON file with data', required=True)
+argdict = vars(parser.parse_args())
+INPUT_PATH = argdict['input']
+OUTPUT_PATH = argdict['output']
 
-
+@typechecked
 class YouTubeVideoScrapper():
-
     def __init__(self) -> None:
         # DRIVER
         op = Options()
@@ -39,12 +41,16 @@ class YouTubeVideoScrapper():
         self.cookies_accepted = False
 
     def go(self, video_id: str) -> None:
+        """
+        Aller à une url d'une page
+        :param video_id: l'id de la video youtube
+        """
 
         # OPEN PAGE
         self.driver.get(f"https://www.youtube.com/watch?v={video_id}")
         self.video_id = video_id
         self.current_url = self.driver.current_url
-        print(f">>> {self.video_id} <<<")
+        print(f">>> {self.video_id}...")
 
         # CLICK COOKIES
         if not self.cookies_accepted:
@@ -60,20 +66,31 @@ class YouTubeVideoScrapper():
         self.soup = BeautifulSoup(str((self.driver.page_source).encode('utf-8')), 'lxml')
 
     def __click_accept_cookies(self) -> None:
+        """
+        fermer la fenêtre des cookies
+        """
         button = self.wait.until(EC.element_to_be_clickable(
             (By.XPATH, '//*[@id="content"]/div[2]/div[6]/div[1]/ytd-button-renderer[2]/yt-button-shape/button')))
         button.click()
         self.cookies_accepted = True
 
     def __click_show_more_description(self) -> None:
-
+        """
+        cliquer sur le bouton pour voir toute la description
+        :return:
+        """
         # button = self.wait.until(EC.visibility_of_element_located((By.XPATH, '//*[@id="expand"]')))
         button = self.driver.find_element(By.XPATH,
                                           '/html/body/ytd-app/div[1]/ytd-page-manager/ytd-watch-flexy/div[5]/div[1]/div/div[2]/ytd-watch-metadata/div/div[3]/div[1]/div/ytd-text-inline-expander/tp-yt-paper-button[1]')
         button.click()
 
     def __scroll_down(self, scroll_pause_time: float = 1, k_scrolls: int = 3) -> None:
-
+        """
+        Scroller tout en bas de la page
+        :param scroll_pause_time: temps de pause entre chaque scrollement
+        :param k_scrolls: nombre de scrollement
+        :return:
+        """
         # Get scroll height
         print(f"  > {self.video_id}... let's scrolling... ")
         last_height = self.driver.execute_script("return document.documentElement.scrollHeight")
@@ -93,7 +110,9 @@ class YouTubeVideoScrapper():
         print(f"  > {self.video_id}ok i'am at the bottom (after {k} scrolling) !")
 
     def get_all_infos(self) -> dict:
-
+        """
+        :return: dictionnaires avec toutes les infos issue du scrapping
+        """
         result = {"video_id": self.video_id, "video_url": self.current_url}
 
         div_above_the_fold = self.soup.find("div", {"id": "above-the-fold"})
@@ -144,14 +163,15 @@ class YouTubeVideoScrapper():
         print(f">>> {self.video_id}... done.")
         return result
 
-
-def read_input_json(json_file_path: str) -> List[str]:
-    with open(json_file_path, "r") as f:
+@typechecked
+def read_input_json(input_json_file_path: str = "input.json") -> List[str]:
+    with open(input_json_file_path, "r") as f:
         data = json.load(f)
     return data["videos_id"]
 
-
+@typechecked
 def write_output_json(data: List[dict], output_file_path: str = "output.json") -> None:
+
     date_time = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
 
     output_dict = {"date_time": date_time, "data": data}
@@ -159,25 +179,31 @@ def write_output_json(data: List[dict], output_file_path: str = "output.json") -
         json.dump(output_dict, f, indent=4)
     print(f"*******\njSON OUTPUT FILE : {output_file_path}\n*******")
 
-
-def chunks(lst: List[Any], n : int) -> List[List[Any]]:
+@typechecked
+def chunks(lst: List[Any], n : int) -> Generator[List[Any], None, None]:
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
         yield lst[i:i + n]
 
-
+@typechecked
 def start_scraping(videos_id : str) -> List[dict]:
     scrapping_results = []
     scrapper = YouTubeVideoScrapper()
     for video_id in videos_id:
         scrapper.go(video_id=video_id)
-        scrapping_results.append(scrapper.get_all_infos())
+        try:
+            scrap_infos = scrapper.get_all_infos()
+        except Exception as e:
+            print(f"ERROR : {str(e)}")
+            break
+        else:
+            scrapping_results.append(scrap_infos)
 
     return scrapping_results
 
 
 def main() -> None:
-    videos_id = read_input_json("input.json")
+    videos_id = read_input_json(INPUT_PATH)
     print(f"*******\nIDs TO SCRAP : {videos_id}\n*******")
 
     p = len(videos_id) // WORKERS
@@ -185,12 +211,12 @@ def main() -> None:
     videos_id_chunks = list(chunks(videos_id, p))
     print([len(v) for v in videos_id_chunks])
 
-    results = []
+    results : List[dict] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=WORKERS) as executor:
         for result in executor.map(start_scraping, videos_id_chunks):
             results += result
 
-    write_output_json(data=results)
+    write_output_json(data=results,output_file_path=OUTPUT_PATH)
 
 
 if __name__ == "__main__":
