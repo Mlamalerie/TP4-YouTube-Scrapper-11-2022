@@ -3,17 +3,11 @@
 Scrape a list of YouYube videos and store the recovered data in a json file.
 
 ## To-do
-- --input input.json --output output.json
 - .venv in github
-- test with pytest
-- map/filter/reduce
-- Découpage de vos fonctions les plus grandes (visez la trentaine de ligne maximum)
-- beautify code and finish typing
-- 
 
 ## How to run :
 
-`python scrapping.py`
+`python scrapping.py --input input.json --output output.json`
 
 ## How it works
 
