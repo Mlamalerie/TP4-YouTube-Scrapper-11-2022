@@ -1,10 +1,9 @@
-
 import json
 import concurrent.futures
 from datetime import datetime
 from bs4 import BeautifulSoup
 from time import sleep
-from typing import List, Tuple, Any,Generator
+from typing import List, Tuple, Any, Generator
 from typeguard import typechecked
 import argparse
 
@@ -15,16 +14,9 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-
 # Params
 WORKERS = 2
-# Args
-parser = argparse.ArgumentParser()
-parser.add_argument('--input', help='Input JSON file with URLs', required=True)
-parser.add_argument('--output', help='Output JSON file with data', required=True)
-argdict = vars(parser.parse_args())
-INPUT_PATH = argdict['input']
-OUTPUT_PATH = argdict['output']
+
 
 @typechecked
 class YouTubeVideoScrapper():
@@ -163,15 +155,16 @@ class YouTubeVideoScrapper():
         print(f">>> {self.video_id}... done.")
         return result
 
+
 @typechecked
 def read_input_json(input_json_file_path: str = "input.json") -> List[str]:
     with open(input_json_file_path, "r") as f:
         data = json.load(f)
     return data["videos_id"]
 
+
 @typechecked
 def write_output_json(data: List[dict], output_file_path: str = "output.json") -> None:
-
     date_time = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
 
     output_dict = {"date_time": date_time, "data": data}
@@ -179,14 +172,16 @@ def write_output_json(data: List[dict], output_file_path: str = "output.json") -
         json.dump(output_dict, f, indent=4)
     print(f"*******\njSON OUTPUT FILE : {output_file_path}\n*******")
 
+
 @typechecked
-def chunks(lst: List[Any], n : int) -> Generator[List[Any], None, None]:
+def chunks(lst: List[Any], n: int) -> Generator[List[Any], None, None]:
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
         yield lst[i:i + n]
 
+
 @typechecked
-def start_scraping(videos_id : str) -> List[dict]:
+def start_scraping(videos_id: str) -> List[dict]:
     scrapping_results = []
     scrapper = YouTubeVideoScrapper()
     for video_id in videos_id:
@@ -203,6 +198,14 @@ def start_scraping(videos_id : str) -> List[dict]:
 
 
 def main() -> None:
+    # Args
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input', help='Input JSON file with URLs', required=True)
+    parser.add_argument('--output', help='Output JSON file with data', required=True)
+    argdict = vars(parser.parse_args())
+    INPUT_PATH = argdict['input']
+    OUTPUT_PATH = argdict['output']
+
     videos_id = read_input_json(INPUT_PATH)
     print(f"*******\nIDs TO SCRAP : {videos_id}\n*******")
 
@@ -211,12 +214,12 @@ def main() -> None:
     videos_id_chunks = list(chunks(videos_id, p))
     print([len(v) for v in videos_id_chunks])
 
-    results : List[dict] = []
+    results: List[dict] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=WORKERS) as executor:
         for result in executor.map(start_scraping, videos_id_chunks):
             results += result
 
-    write_output_json(data=results,output_file_path=OUTPUT_PATH)
+    write_output_json(data=results, output_file_path=OUTPUT_PATH)
 
 
 if __name__ == "__main__":
