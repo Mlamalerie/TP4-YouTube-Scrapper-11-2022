@@ -181,7 +181,7 @@ def chunks(lst: List[Any], n: int) -> Generator[List[Any], None, None]:
 
 
 @typechecked
-def start_scraping(videos_id: str) -> List[dict]:
+def start_scraping(videos_id: list) -> List[dict]:
     scrapping_results = []
     scrapper = YouTubeVideoScrapper()
     for video_id in videos_id:
