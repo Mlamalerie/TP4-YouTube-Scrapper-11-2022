@@ -12,8 +12,8 @@ def test_can_go_to_page(scrapper):
     assert scrapper.current_url == "https://www.youtube.com/watch?v=YbpKMIUjvK8"
 
 def test_click_cookies(scrapper):
-    assert 1 == 1
+    pass
 
 def test_scrolling_at_the_bottom(scrapper):
-    assert 1 == 1
+    pass
 
